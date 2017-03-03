@@ -20,7 +20,7 @@ contract RecoveryQuorumBasic {
 
   modifier currentDelegate(Delegate d) {
     if (!delegateRecordExists(d)) throw;
-    if (!delegateIsCurrent(d)) {delete delegates[addressToCheck];}
+    if (!delegateIsCurrent(d)) {delete delegates[addressToCheck];} //does not account for case when delegate is pending (aka, does not update numDelegatesAfter) 
     else {_;}
   }
 
@@ -54,11 +54,9 @@ contract RecoveryQuorumBasic {
   }
 
   function neededSignatures() returns (uint) {
-    uint curr = 0;
     for (uint i = 0; i < timeDelegateNumChanges - 1; i++) {
-      if (timeDelegateNumChanges[i + 1] <= now) {curr = i;}
-    }
-    return numDelegatesAfter[timeDelegateNumChanges[curr]];
+      if (timeDelegateNumChanges[i + 1] <= now) {return numDelegatesAfter[timeDelegateNumChanges[i]];}
+    }   
   }
 
   function replaceDelegates(address[] delegatesToRemove, address[] delegatesToAdd) {
@@ -82,10 +80,10 @@ contract RecoveryQuorumBasic {
       } //don't account for case when delegate is pending - as it complicates things.
     }
 
-    delInPrevEra = timeDelegateNumChanges[timeDelegateNumChanges.length - 1];
+    delegInPrevEra = timeDelegateNumChanges[timeDelegateNumChanges.length - 1];
     timeDelegateNumChanges[timeDelegateNumChanges.length - 1] = now + controller.longTimeLock();
     timeDelegateNumChanges.push(31536000000000);
-    numDelegatesAfter[now + controller.longTimeLock()] = delInPrevEra + addedAtLongLock - deletedAtLongLock;
+    numDelegatesAfter[now + controller.longTimeLock()] = delegInPrevEra + addedAtLongLock - deletedAtLongLock;
   }
 
   function delegateRecordExists(Delegate d) private returns (bool){
