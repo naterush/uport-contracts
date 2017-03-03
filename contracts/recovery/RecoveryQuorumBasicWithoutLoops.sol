@@ -20,7 +20,7 @@ contract RecoveryQuorumBasic {
 
   modifier currentDelegate(Delegate d) {
     if (!delegateRecordExists(d)) throw;
-    if (!delegateIsCurrent(d)) {delete delegates[addressToCheck];} //does not account for case when delegate is pending (aka, does not update numDelegatesAfter) 
+    if (!delegateIsCurrent(d)) {delete d;}
     else {_;}
   }
 
@@ -54,36 +54,38 @@ contract RecoveryQuorumBasic {
   }
 
   function neededSignatures() returns (uint) {
-    for (uint i = 0; i < timeDelegateNumChanges - 1; i++) {
-      if (timeDelegateNumChanges[i + 1] <= now) {return numDelegatesAfter[timeDelegateNumChanges[i]];}
-    }   
+    uint curr = 0;
+    for (uint i = 0; i < timeDelegateNumChanges.length - 1; i++) {
+      if (timeDelegateNumChanges[i + 1] <= now) {curr = i;}
+    }
+    return numDelegatesAfter[timeDelegateNumChanges[curr]];
   }
 
   function replaceDelegates(address[] delegatesToRemove, address[] delegatesToAdd) {
     uint deletedAtLongLock;
     uint addedAtLongLock;
 
-    for(uint i = 0 ; i < delegatesToAdd.length ; i++) {
-      if (!delegateRecordExists[delegates[delegatesToAdd[i]]]) {
+    for(uint i = 0; i < delegatesToAdd.length ; i++) {
+      if (!delegateRecordExists(delegates[delegatesToAdd[i]])) {
         delegates[delegatesToAdd[i]] = Delegate({proposedUserKey: 0x0, pendingUntil: 0, deletedAfter: 31536000000000});
         addedAtLongLock++;
       }
     }
 
-    for(uint i = 0 ; i < delegatesToRemove.length ; i++) {
-      if (delegateIsDeleted[delegates[delegatesToRemove[i]]]) {
-        delete delegates[delegatesToRemove[i]];
+    for(uint j = 0; j < delegatesToRemove.length ; j++) {
+      if (delegateIsDeleted(delegates[delegatesToRemove[j]])) {
+        delete delegates[delegatesToRemove[j]];
       }
-      else if (delegateIsCurrent[delegates[delegatesToRemove[i]]]) {
-        delegatesToRemove[i].deletedAfter = now + controller.longTimeLock();
+      else if (delegateIsCurrent(delegates[delegatesToRemove[j]])) {
+        delegates[delegatesToRemove[j]].deletedAfter = now + controller.longTimeLock();
         deletedAtLongLock++;
       } //don't account for case when delegate is pending - as it complicates things.
     }
 
-    delegInPrevEra = timeDelegateNumChanges[timeDelegateNumChanges.length - 1];
+    uint delInPrevEra = timeDelegateNumChanges[timeDelegateNumChanges.length - 1];
     timeDelegateNumChanges[timeDelegateNumChanges.length - 1] = now + controller.longTimeLock();
     timeDelegateNumChanges.push(31536000000000);
-    numDelegatesAfter[now + controller.longTimeLock()] = delegInPrevEra + addedAtLongLock - deletedAtLongLock;
+    numDelegatesAfter[now + controller.longTimeLock()] = delInPrevEra + addedAtLongLock - deletedAtLongLock;
   }
 
   function delegateRecordExists(Delegate d) private returns (bool){
